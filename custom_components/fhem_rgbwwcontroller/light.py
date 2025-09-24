@@ -63,15 +63,15 @@ class RgbwwLight(LightEntity):
         hass: HomeAssistant,
         controller: RgbwwController,
         unique_id: str,
-        title: str,
+        name: str,
         host: str,
     ) -> None:
         """Initialize the light."""
         super().__init__()
         self._hass = hass
         self._host = host
-        self._attr_unique_id = unique_id
-        self._attr_name = title
+        self._attr_unique_id = unique_id + "_light"
+        self._attr_name = name + " Light"
 
         self._attr_supported_color_modes = (
             ColorMode.HS,

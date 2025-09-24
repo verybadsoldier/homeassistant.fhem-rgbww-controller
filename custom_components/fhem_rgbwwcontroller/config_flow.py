@@ -68,12 +68,13 @@ class RgbwwConfigFlow(ConfigFlow, domain=DOMAIN):
                 info = await controller.get_info()
 
                 await self.async_set_unique_id(info["connection"]["mac"])
+                self._abort_if_unique_id_configured()
 
                 return self.async_create_entry(
-                    title=user_input["name"], data=user_input
+                    title=user_input[CONF_NAME], data=user_input
                 )
             except HTTPError:
-                errors["host"] = f"Cannot retrieve MAC address from host {host}"
+                errors[CONF_HOST] = f"Cannot retrieve MAC address from host {host}"
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
