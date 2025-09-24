@@ -1,4 +1,8 @@
-from config.custom_components.fhem_rgbwwcontroller.entity import RgbwwDevice
+from typing import Any
+from .entity import RgbwwDevice
+from .rgbww_controller import (
+    RgbwwController,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -30,7 +34,7 @@ async def async_setup_entry(
 class RgbwwLight(RgbwwDevice, LightEntity):
     """Representation of an Abode light."""
 
-    _device: object
+    _device: RgbwwController | None = None
     _attr_name = None
     _attr_max_color_temp_kelvin = DEFAULT_MAX_KELVIN
     _attr_min_color_temp_kelvin = DEFAULT_MIN_KELVIN
@@ -75,17 +79,18 @@ class RgbwwLight(RgbwwDevice, LightEntity):
     @property
     def color_temp_kelvin(self) -> int | None:
         """Return the color temp of the light."""
-        if self._device.has_color:
-            return int(self._device.color_temp)
-        return None
+        return self._device.state.color_temp
 
     @property
     def hs_color(self) -> tuple[float, float] | None:
         """Return the color of the light."""
-        _hs = None
-        if self._device.has_color:
-            _hs = self._device.color
-        return _hs
+        match self._device.state.color_mode:
+            case "hsv":
+                return self._device.state.hue, self._device.state.saturation
+            case "raw":
+                return None
+            case _ as e:
+                raise RuntimeError(f"Unknown color mode: {e}")
 
     @property
     def color_mode(self) -> str | None:

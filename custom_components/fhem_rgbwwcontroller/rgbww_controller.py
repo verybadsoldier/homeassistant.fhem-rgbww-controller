@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 import enum
 import httpx
 import asyncio, socket
 import json
+from typing import Literal
 
 
 class _HttpMethod(enum.Enum):
@@ -62,6 +64,15 @@ class _TcpReceiver(asyncio.Protocol):
         self.on_con_lost.set_result(True)
 
 
+@dataclass
+class _State:
+    color_temp: int
+    hue: int
+    saturation: int
+    brightness: int
+    color_mode: Literal["raw", "hsv"]
+
+
 class RgbwwController:
     """The actual binding to the controller via network."""
 
@@ -69,6 +80,7 @@ class RgbwwController:
 
     def __init__(self, host: str) -> None:
         self._host = host
+        self.state = _State()
 
     async def set_hsv(self, hue: int | None) -> None:
         data = {
