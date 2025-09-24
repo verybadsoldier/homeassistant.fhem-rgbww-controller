@@ -1,0 +1,14 @@
+{
+  "domain": "fhem_rgbwwcontroller",
+  "name": "FHEM RGBWW Controller",
+  "codeowners": [
+    "@verybadsoldier"
+  ],
+  "version": "0.0.1",
+  "config_flow": true,
+  "documentation": "https://www.home-assistant.io/integrations/fhem_rgbwwcontroller",
+  "iot_class": "local_push",
+  "quality_scale": "legacy",
+  "requirements": [
+  ]
+}
