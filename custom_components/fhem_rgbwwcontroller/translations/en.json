@@ -1,21 +1,26 @@
 {
-    "config": {
-        "abort": {
-            "already_configured": "Device is already configured"
+  "config": {
+    "abort": {
+      "already_configured": "Device is already configured"
+    },
+    "error": {
+      "cannot_connect": "Failed to connect",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "user": {
+        "title": "Setup FHEM RGBWW Controller",
+        "description": "Use the configuration of the integration to add RGBWW device.",
+        "menu_options": {
+          "scan": "Automatic discovery of controllers",
+          "manual": "Manual"
         },
-        "error": {
-            "cannot_connect": "Failed to connect",
-            "invalid_auth": "Invalid authentication",
-            "unknown": "Unexpected error"
-        },
-        "step": {
-            "user": {
-                "data": {
-                    "host": "Host",
-                    "password": "Password",
-                    "username": "Username"
-                }
-            }
+        "menu_option_descriptions": {
+          "scan": "Scan IP range for controllers",
+          "manual": "Add one controller by specifying its IP address or hostname"
         }
+      }
     }
+  }
 }

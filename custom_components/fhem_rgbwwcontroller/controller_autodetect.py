@@ -4,7 +4,7 @@ import httpx
 import ipaddress
 import logging
 import netifaces
-from rgbww_controller import RgbwwController
+from .rgbww_controller import RgbwwController
 
 _logger = logging.getLogger(__name__)
 
@@ -49,19 +49,19 @@ def get_scan_range() -> ipaddress.IPv4Network | None:
         return None
 
 
-async def scan(network: ipaddress.IPv4Network) -> list[RgbwwController]:
+async def scan(network: ipaddress.IPv4Network) -> list[asyncio.Task[RgbwwController]]:
     """Scans the given network for FHEM RGBWW Controller devices."""
     if network.prefixlen < 13:
         raise ValueError(
             "Network prefix is too broad. Please use a subnet mask of /12 or smaller."
         )
 
-    tasks = [_check_ip(str(ip)) for ip in network.hosts()]
-
-    results = await asyncio.gather(*tasks)
+    return [_check_ip(str(ip)) for ip in network.hosts()]
+    # return asyncio.create_task(asyncio.gather(*tasks))
+    # results = await asyncio.gather(*tasks)
 
     # Filter out None results
-    return [res for res in results if res is not None]
+    # return [res for res in results if res is not None]
 
 
 async def _check_ip(ip: str) -> RgbwwController | None:

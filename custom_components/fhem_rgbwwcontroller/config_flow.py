@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import ipaddress
 import logging
 from typing import Any
 
@@ -24,6 +26,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import TextSelector
 
+from . import controller_autodetect
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -42,33 +45,66 @@ class RgbwwConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    def __init__(self):
+        super().__init__()
+        self._scan_task: asyncio.Task | None = None
+
+    def _show_menu(self) -> ConfigFlowResult:
+        """Show the initial menu."""
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["scan", "manual"],
+        )
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step."""
-        errors: dict[str, str] = {}
+        """Handle the user confirmation step."""
+        # Abort if an instance is already configured
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
+
+        # If user_input is not None, the user has clicked "Submit"
         if user_input is not None:
-            host = user_input[CONF_HOST]
-            controller = RgbwwController(host)
+            # Create the config entry with an empty title and data
+            return self.async_create_entry(title="My Simple Integration", data={})
 
-            try:
-                info = await controller.get_info()
+        # Show the confirmation form to the user
+        # The description will be pulled from strings.json
+        return self._show_menu()
 
-                # the unique_id will not be matching the device MAC anymore
-                # after replacing the device as the unique_id won't be updated
-                mac = info["connection"]["mac"]
-                await self.async_set_unique_id(mac)
-                self._abort_if_unique_id_configured(f"Controller with MAC '{mac}'")
-
-                return self.async_create_entry(
-                    title=user_input[CONF_NAME], data=user_input
-                )
-            except HTTPError:
-                errors[CONF_HOST] = f"Cannot retrieve MAC address from host {host}"
-
+    async def async_step_scan(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="start_scan",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("ip_range", default="192.168.2.0/24"): TextSelector(),
+                }
+            ),
+            errors={},
         )
+
+    async def async_step_start_scan(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        network = ipaddress.IPv4Network(user_input["ip_range"])
+        tasks = controller_autodetect.scan_tasks(network)
+
+        return self.async_show_progress(
+            progress_action="scanning",
+            progress_task=self._scan_task,
+        )
+
+        return self.async_show_progress_done(next_step_id="scan_finished")
+
+    async def async_step_scan_finished(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        if not user_input:
+            return self.async_show_form(step_id="finish")
+        return self.async_create_entry(title="Some title", data={})
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
@@ -108,4 +144,30 @@ class RgbwwConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             ),
             errors=errors,
+        )
+
+
+from homeassistant.config_entries import OptionsFlowWithReload
+
+OPTIONS_SCHEMA = vol.Schema(
+    {
+        vol.Required("show_things"): bool,
+    }
+)
+
+
+class RgbwwFlowHandler(OptionsFlowWithReload):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        return self.async_show_menu(
+            step_id="user",
+            menu_options=["Add one controller", "Scan network for controllers"],
+            description_placeholders={
+                "model": "Example model",
+            },
         )
