@@ -65,8 +65,7 @@ async def async_setup_entry(
     rgb = RgbwwLight(
         hass,
         controller,
-        entry.unique_id,
-        entry.title,
+        entry,
     )
 
     async_add_entities((rgb,))
@@ -106,17 +105,19 @@ class RgbwwLight(LightEntity):
         self,
         hass: HomeAssistant,
         controller: RgbwwController,
-        unique_id: str,
-        name: str,
+        entry: ConfigEntry,
     ) -> None:
         """Initialize the light."""
         super().__init__()
 
+        self._config_entry = entry
         self._controller = controller
 
+        self._first_connection = True
         self._hass = hass
-        self._attr_unique_id = unique_id + "_light"
-        self._attr_name = name + " Light"
+        #if unique_id is not None:
+        #    self._attr_unique_id = unique_id + "_light"
+        self._attr_name = entry.title + " Light"
 
         self._attr_supported_color_modes = (
             ColorMode.HS,
@@ -130,23 +131,6 @@ class RgbwwLight(LightEntity):
         )
         self._attr_color_mode = {ColorMode.HS}
 
-        self._attr_available = controller.connected
-        self._attr_color_temp_kelvin = self._controller.color.color_temp
-        self._attr_max_color_temp_kelvin = self._controller.config["color"][
-            "colortemp"
-        ]["cw"]
-        self._attr_min_color_temp_kelvin = self._controller.config["color"][
-            "colortemp"
-        ]["ww"]
-
-        # --- ENTITY AND DEVICE LINKING ---
-
-        # This `device_info` block links the entity to the device
-        # in __init__.py. The `identifiers` MUST match exactly.
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, unique_id)},
-        )
-        # --- END LINKING ---
 
     async def async_added_to_hass(self) -> None:
         self._controller.register_callback(self)
@@ -169,9 +153,37 @@ class RgbwwLight(LightEntity):
         self.async_write_ha_state()
 
     # protocol rgbww state
-    def on_avilability_update(self, connected: bool) -> None:
+    async def on_avilability_update(self, connected: bool) -> None:
         self._attr_available = connected
 
+        if connected and self._first_connection:
+            self._first_connection = False
+
+        #self._attr_color_temp_kelvin = self._controller.color.color_temp
+        #self._attr_max_color_temp_kelvin = self._controller.config["color"][
+        #    "colortemp"
+        #]["cw"]
+        #self._attr_min_color_temp_kelvin = self._controller.config["color"][
+        #    "colortemp"
+        #]["ww"]
+
+            # --- ENTITY AND DEVICE LINKING ---
+
+        #sw_version=f"{controller.info['git_version']} (WebApp:{controller.info['webapp_version']})",
+
+            # This `device_info` block links the entity to the device
+            # in __init__.py. The `identifiers` MUST match exactly.
+            await self._controller.refresh()
+
+            self._attr_device_info = DeviceInfo(
+                config_entry_id=self._config_entry.entry_id,
+                identifiers={(DOMAIN, self._config_entry.unique_id)},
+                name=self._config_entry.title,  # The name the user gave in the config flow
+                manufacturer="Homebrew Hardware",
+                model="FHEM RGBWW LED Controller",  # Replace with actual model
+                sw_version=f"{self._controller.info['git_version']} (WebApp:{self._controller.info['webapp_version']})",
+            )
+            # --- END LINKING ---
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:

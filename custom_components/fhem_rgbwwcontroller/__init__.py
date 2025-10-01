@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import datetime
-from httpx import HTTPStatusError
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
@@ -44,12 +42,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Erstelle eine Hub-Instanz für DIESES GERÄT
     # Wir übergeben die entry.unique_id (also die IP) für eine eindeutige Identifikation
     controller = RgbwwController(host)
-
-    entry.runtime_data = controller
-
     await controller.connect()
 
-    await controller.refresh()
+    entry.runtime_data = controller
 
     # --- DEVICE REGISTRATION ---
     # This is the new part. We create a device in the registry.
@@ -60,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         name=entry.title,  # The name the user gave in the config flow
         manufacturer="Homebrew Hardware",
         model="FHEM RGBWW LED Controller",  # Replace with actual model
-        sw_version=f"{controller.info['git_version']} (WebApp:{controller.info['webapp_version']})",
+        #sw_version=f"{controller.info['git_version']} (WebApp:{controller.info['webapp_version']})",
     )
     # --- END DEVICE REGISTRATION ---
 

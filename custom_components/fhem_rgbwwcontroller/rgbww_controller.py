@@ -116,6 +116,9 @@ class RgbwwController(RgbwwReceiver):
         self._callbacks: list[RgbwwStateUpdate] = []
         self._transport: asyncio.Transport | None = None
         self._watchdog_handle: asyncio.TimerHandle | None = None
+        self._buffer = ""
+        self._stop_event = asyncio.Event()
+        self._writer: asyncio.StreamWriter | None = None
 
     def _reset_watchdog(self):
         """Resets or starts the connection watchdog."""
@@ -129,7 +132,94 @@ class RgbwwController(RgbwwReceiver):
             RgbwwController.TIMEOUT, self._timeout_occurred
         )
 
+    def _consume_json_msg(self) -> dict | None:
+        try:
+            # Try to decode an object from the current position
+            decoder = json.JSONDecoder()
+            json_obj, end_pos = decoder.raw_decode(self._buffer)
+
+            self._buffer = self._buffer[end_pos:]
+            # If successful, process the message
+            return json_obj
+        except json.JSONDecodeError:
+            # Not a complete JSON object yet, break and wait for more data
+            return None
+
+    def __data_received(self, data):
+        self._buffer += data.decode("utf-8")
+
+        while (json_msg := self._consume_json_msg()) is not None:
+            self._sink.on_json_message(json_msg)
+
     async def _run_connection_task(self):
+        """
+        Connects to a server and automatically reconnects if the connection is lost.
+        """
+        host = self.host
+        port = self._TCP_PORT
+        while not self._stop_event.is_set():
+            try:
+                # 1. Attempt to connect
+                _logger.info(f"🔌 Attempting to connect to %s:%s...", host, port)
+                reader, self._writer = await asyncio.open_connection(host, port)
+
+                # 2. Connection Established Notification
+                # If we reach this line, the connection was successful.
+                ##peername = writer.get_extra_info('peername')
+                ##print(f"✅ Connection established with {peername}")
+                self.on_connect_status_change(True)
+                KEEPALIVE_TIMEOUT = 70
+                # 3. Main loop to read data (your "work" goes here)
+                while not self._stop_event.is_set():
+                    # For your LED controller, this is where you'd wait for events.
+                    try:
+                        data = await asyncio.wait_for(reader.read(4096), timeout=KEEPALIVE_TIMEOUT) # Read up to 4KB
+                    except asyncio.TimeoutError:
+                        # No data, controller is gone...
+                        _logger.warning("🔥 Keep-alive timeout! No data received for %s s.", KEEPALIVE_TIMEOUT)
+                        break
+
+                    if not data:
+                        # This indicates the server has closed the connection gracefully.
+                        _logger.warning("🚪 Server closed the connection.")
+                        break # Exit the inner loop to trigger reconnection logic.
+
+                    # --- PROCESS YOUR DATA HERE ---
+                    self._buffer += data.decode("utf-8")
+
+                    while (json_msg := self._consume_json_msg()) is not None:
+                        self.on_json_message(json_msg)
+                    # -----------------------------
+
+            except (ConnectionRefusedError, OSError) as e:
+                # This happens if the server is not running or unreachable
+                _logger.warning(f"❌ Connection failed: {e}")
+
+            except (ConnectionResetError, asyncio.IncompleteReadError) as e:
+                # This happens if an established connection is lost mid-communication
+                _logger.warning(f"💔 Connection lost: {e}")
+                self.on_connect_status_change(False)
+
+            except Exception as e:
+                # Catch any other unexpected errors
+                _logger.error(f"An unexpected error occurred: %s", str(e))
+                self.on_connect_status_change(False)
+
+            finally:
+                # 4. Cleanup before retrying
+                if self._writer:
+                    self._writer.close()
+                    await self._writer.wait_closed()
+
+            # 5. Wait before reconnecting
+            reconnect_delay = 60
+            _logger.info(f"🔄 Reconnecting in %s seconds...", reconnect_delay)
+            try:
+                await asyncio.wait_for(self._stop_event, reconnect_delay)
+            except asyncio.TimeoutError:
+                pass
+
+    async def _run_connection_task_(self):
         """Connect to the device and keep connection alive in the event of a connection loss."""
         while True:
             try:
@@ -184,9 +274,12 @@ class RgbwwController(RgbwwReceiver):
         if self._connection_task is not None:
             return  # Connection task already running
 
+        self._stop_event = asyncio.Event()
         self._connection_task = asyncio.create_task(
             self._run_connection_task(), name="fhem_rgbwwcontroller_connection"
         )
+
+
 
     async def connect_wait_for_connection(
         self, timeout: timedelta = timedelta(seconds=10)
@@ -196,12 +289,22 @@ class RgbwwController(RgbwwReceiver):
         await asyncio.wait_for(self._on_con_established, timeout)
 
     async def disconnect(self):
-        if self._transport is None:
-            return
+        """
+        External function to signal the client to stop.
+        """
+        if self._stop_event.is_set():
+            return # Already stopping
 
         _logger.error("%s - Disconnecting", self.host)
-        self._connection_task.cancel()
-        self._transport.close()
+
+        # 1. Signal the loop to not attempt reconnection
+        self._stop_event.set()
+
+        # 2. If there's an active connection, close it to interrupt reader.read()
+        if self._writer:
+            _logger.info("Closing active connection...")
+            self._writer.close()
+            await self._writer.wait_closed()
 
     def _timeout_occurred(self):
         _logger.warning(
@@ -209,6 +312,7 @@ class RgbwwController(RgbwwReceiver):
             self.host,
             RgbwwController.TIMEOUT,
         )
+        self.disconnect()
 
     async def set_hsv(
         self,
