@@ -35,7 +35,9 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import DOMAIN
 from .rgbww_controller import ControllerUnavailableError, RgbwwController
 
-SERVICE_SET_HSV_ADV = "set_hsv_advanced"
+from .animation_syntax import parse_animation_commands
+
+SERVICE_ANIMATION = "animation"
 SERVICE_PAUSE = "PAUSE"
 SERVICE_CONTINUE = "CONTINUE"
 SERVICE_SKIP = "SKIP"
@@ -44,10 +46,10 @@ SERVICE_STOP = "STOP"
 _logger = logging.getLogger(__name__)
 
 
-def _service_set_hsv_advanced(self, call: ServiceCall) -> None:
-    print("hhlo")
-    if call.data["hsv_command_string"] == "fade":
-        print("as")
+def _service_animation(self, call: ServiceCall) -> None:
+    anims = parse_animation_commands(call.data["anim_definition"])
+    ...
+
 
 
 def _service_pause(self, call: ServiceCall) -> None:
@@ -79,23 +81,23 @@ async def async_setup_entry(
     # Register the service to set HSV with advanced options
     platform = entity_platform.async_get_current_platform()
     platform.async_register_entity_service(
-        SERVICE_SET_HSV_ADV,
-        {vol.Required("hsv_command_string"): cv.string},
-        _service_set_hsv_advanced,
+        SERVICE_ANIMATION,
+        {vol.Required("anim_definition"): cv.string},
+        _service_animation,
     )
 
-    platform.async_register_entity_service(
-        SERVICE_PAUSE,
-        vol.Schema(
-            {
-                vol.Required("all_channels"): bool,
-                vol.Optional("channel_h"): bool,
-                vol.Optional("channel_s"): bool,
-                vol.Optional("channel_v"): bool,
-            }
-        ),
-        _service_pause,
-    )
+    #platform.async_register_entity_service(
+    #    SERVICE_PAUSE,
+    #    vol.Schema(
+    #        {
+    #            vol.Required("all_channels"): bool,
+    #            vol.Optional("channel_h"): bool,
+    #            vol.Optional("channel_s"): bool,
+    #            vol.Optional("channel_v"): bool,
+    #        }
+    #    ),
+    #    _service_pause,
+    #)
 
 
 # we implement RgbwwStateUpdate but we cannot derive from here due to metaclass error

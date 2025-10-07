@@ -14,23 +14,22 @@ set_hsv_advanced_old:
       selector:
         text:
 
-set_hsv_advanced:
-  name: Set a list of HSV Colors
+animation:
+  name: Run an animation on the controller
   description: >
     Sets a sequence of colors using a list of HSV values.
     The list must not be empty.
+  target:
+    entity:
+      domain: light
   fields:
-    hsv_list:
+    anim_definition:
       name: HSV Color List
       description: "A list of HSV objects. Each value can be 0-100 or a relative string like '+1000'."
       required: true
+      example: "120,0,5 5"
       selector:
-        object:
-      example:
-        - h: 50
-          s: '+1500'
-        - v: 99
-
+        text:
 pause:
   name: Pause
   description: >
