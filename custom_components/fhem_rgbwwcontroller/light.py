@@ -1,12 +1,21 @@
+"""Light platform for the fhem led controller integration."""
+
+import logging
 from typing import Any, cast
 
 import voluptuous as vol
+import functools
+from homeassistant.util.scaling import (
+    scale_ranged_value_to_int_range,
+    scale_to_ranged_value,
+)
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,
     ATTR_HS_COLOR,
     ATTR_RGBWW_COLOR,
+    ATTR_TRANSITION,
     DEFAULT_MAX_KELVIN,
     DEFAULT_MIN_KELVIN,
     ColorMode,
@@ -16,26 +25,23 @@ from homeassistant.components.light import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import entity_platform
-from homeassistant.util.color import (
-    color_hs_to_xy,
-    color_temperature_kelvin_to_mired,
-    color_temperature_mired_to_kelvin,
-)
-
 
 # Import the device class from the component that you want to support
 import homeassistant.helpers.config_validation as cv
+import homeassistant.helpers.device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DOMAIN
-from .rgbww_controller import RgbwwController
+from .rgbww_controller import ControllerUnavailableError, RgbwwController
 
 SERVICE_SET_HSV_ADV = "set_hsv_advanced"
 SERVICE_PAUSE = "PAUSE"
 SERVICE_CONTINUE = "CONTINUE"
 SERVICE_SKIP = "SKIP"
 SERVICE_STOP = "STOP"
+
+_logger = logging.getLogger(__name__)
 
 
 def _service_set_hsv_advanced(self, call: ServiceCall) -> None:
@@ -113,27 +119,31 @@ class RgbwwLight(LightEntity):
         self._config_entry = entry
         self._controller = controller
 
-        self._first_connection = True
-        self._hass = hass
-        #if unique_id is not None:
+        # self.hass = hass
+        # if unique_id is not None:
         #    self._attr_unique_id = unique_id + "_light"
         self._attr_name = entry.title + " Light"
+        self._attr_unique_id = f"{entry.unique_id}_lightunique"
 
-        self._attr_supported_color_modes = (
+        self._attr_supported_color_modes = {
+            # ColorMode.ONOFF,
             ColorMode.HS,
-            # ColorMode.RGBWW,
             ColorMode.COLOR_TEMP,
-        )
+        }
         self._attr_supported_features = (
-            LightEntityFeature.TRANSITION
-            | LightEntityFeature.FLASH
-            | LightEntityFeature.EFFECT
+            LightEntityFeature.TRANSITION | LightEntityFeature.FLASH
+            # | LightEntityFeature.EFFECT
         )
-        self._attr_color_mode = {ColorMode.HS}
 
+        # self._attr_effect_list = ["Pause", "Continue", "Skip", "Stop"]
+        # self._attr_effect = None
 
     async def async_added_to_hass(self) -> None:
+        """Subscribe to the events."""
         self._controller.register_callback(self)
+
+        if self._controller.state_completed:
+            self.on_state_completed()
 
     async def async_will_remove_from_hass(self) -> None:
         """Unsubscribe from the events."""
@@ -141,71 +151,159 @@ class RgbwwLight(LightEntity):
 
         await super().async_will_remove_from_hass()
 
-    def on_update_hsv(self, h: int | None, s: int | None, v: int | None) -> None:
-        if h is not None:
-            self._attr_hs_color = (h, s)
+    def on_update_color(self) -> None:  # noqa: D102
+        if not self._controller.state_completed:
+            return
 
-        if v is not None:
-            self._attr_brightness = (v / 100.0) * 255
+        match self._controller.color.color_mode:
+            case "raw":
+                raw_conv = functools.partial(
+                    scale_ranged_value_to_int_range, (0, 1023), (0, 255)
+                )
 
-        self._attr_is_on = v > 0
+                self._attr_rgbww_color = (
+                    raw_conv(self._controller.color.raw_r),
+                    raw_conv(self._controller.color.raw_g),
+                    raw_conv(self._controller.color.raw_b),
+                    raw_conv(self._controller.color.raw_cw),
+                    raw_conv(self._controller.color.raw_ww),
+                )
+                self._attr_is_on = (
+                    self._controller.color.raw_r > 0
+                    or self._controller.color.raw_g > 0
+                    or self._controller.color.raw_b > 0
+                    or self._controller.color.raw_ww > 0
+                    or self._controller.color.raw_cw > 0
+                )
+                # self._attr_color_mode = ColorMode.RGBWW
+            case "hsv":
+                self._attr_hs_color = (
+                    self._controller.color.hue,
+                    self._controller.color.saturation,
+                )
+
+                v = self._controller.color.brightness
+                if v is not None:
+                    self._attr_brightness = scale_ranged_value_to_int_range(
+                        (0, 100), (0, 255), v
+                    )
+
+                self._attr_is_on = v > 0
+                # self._attr_color_temp_kelvin = self._controller.color.color_temp
+                # self._attr_color_mode = ColorMode.HS
+            case _:
+                ...
+        self._attr_color_mode = ColorMode.HS
+        self.async_write_ha_state()
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        di = DeviceInfo(
+            identifiers={
+                # Serial numbers are unique identifiers within a specific domain
+                (DOMAIN, self.unique_id)
+            },
+            name=self.name,
+            manufacturer="FHEM Community :)",
+            model="FHEM RGBWW LED Controller",
+            # sw_version=f"{self._controller.info['git_version']} (WebApp:{self._controller.info['webapp_version']})",
+        )
+
+        if self._controller.connected:
+            di["sw_version"] = (
+                f"{self._controller.info['git_version']} (WebApp:{self._controller.info['webapp_version']})"
+            )
+        return di
+
+    def _update_ha_device(self) -> None:
+        device_registry = dr.async_get(self.hass)
+
+        device_entry = device_registry.async_get_device(
+            identifiers={(DOMAIN, self.unique_id)}
+        )
+
+        assert device_entry is not None
+
+        updated_info = {
+            "sw_version": f"{self._controller.info['git_version']} (WebApp:{self._controller.info['webapp_version']})",
+        }
+
+        device_registry.async_update_device(
+            device_id=device_entry.id,
+            **updated_info,
+        )
 
         self.async_write_ha_state()
 
     # protocol rgbww state
-    async def on_avilability_update(self, connected: bool) -> None:
-        self._attr_available = connected
+    def on_state_completed(self) -> None:
+        self.on_update_color()  # Update color first to set color mode, otherwise brightness might be ignored
+        self.on_connection_update()
+        self.on_config_update()
+        self._update_ha_device()
+        self._attr_available = True
 
-        if connected and self._first_connection:
-            self._first_connection = False
-
-        #self._attr_color_temp_kelvin = self._controller.color.color_temp
-        #self._attr_max_color_temp_kelvin = self._controller.config["color"][
-        #    "colortemp"
-        #]["cw"]
-        #self._attr_min_color_temp_kelvin = self._controller.config["color"][
-        #    "colortemp"
-        #]["ww"]
-
-            # --- ENTITY AND DEVICE LINKING ---
-
-        #sw_version=f"{controller.info['git_version']} (WebApp:{controller.info['webapp_version']})",
-
-            # This `device_info` block links the entity to the device
-            # in __init__.py. The `identifiers` MUST match exactly.
-            await self._controller.refresh()
-
-            self._attr_device_info = DeviceInfo(
-                config_entry_id=self._config_entry.entry_id,
-                identifiers={(DOMAIN, self._config_entry.unique_id)},
-                name=self._config_entry.title,  # The name the user gave in the config flow
-                manufacturer="Homebrew Hardware",
-                model="FHEM RGBWW LED Controller",  # Replace with actual model
-                sw_version=f"{self._controller.info['git_version']} (WebApp:{self._controller.info['webapp_version']})",
-            )
-            # --- END LINKING ---
+    def on_connection_update(self) -> None:
+        if self._controller.connected:
+            return
+        self._attr_available = self._controller.connected
         self.async_write_ha_state()
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
-        if (rgbww := kwargs.get(ATTR_RGBWW_COLOR)) is not None:
-            await self._controller.set_raw(*rgbww)
-        elif (hs := kwargs.get(ATTR_HS_COLOR)) is not None:
-            self._attr_color_mode = ColorMode.HS
-            args = {"hue": hs[0], "saturation": hs[1]}
-            if "transition" in kwargs:
-                args["t"] = float(kwargs["transition"])
-            await self._controller.set_hsv(**args)
-        elif (ct := kwargs.get(ATTR_COLOR_TEMP_KELVIN)) is not None:
-            await self._controller.set_hsv(ct=ct)
-        elif (rgbww := kwargs.get(ATTR_RGBWW_COLOR)) is not None:
-            self._attr_color_mode = ColorMode.RGBWW
-            # Call your API's raw mode function
-        elif (brightness := kwargs.get(ATTR_BRIGHTNESS)) is not None:
-            await self._controller.set_hsv(brightness=(brightness / 255.0) * 100)
-        else:  # Turn on with last known state or default
-            await self._controller.set_hsv(brightness=100)
-        self.async_write_ha_state()
+        try:
+            attr_changed = False
+            hsv_params: dict[str, Any] = {}
+
+            if (rgbww := kwargs.get(ATTR_RGBWW_COLOR)) is not None:
+                raw_conv = functools.partial(
+                    scale_ranged_value_to_int_range, (0, 255), (0, 1024)
+                )
+
+                ctrl_raw = (
+                    raw_conv(rgbww[0]),
+                    raw_conv(rgbww[1]),
+                    raw_conv(rgbww[2]),
+                    raw_conv(rgbww[3]),
+                    raw_conv(rgbww[4]),
+                )
+                await self._controller.set_raw(*ctrl_raw)
+                self._attr_rgbww_color = rgbww
+                attr_changed = True
+                self._attr_color_mode = ColorMode.RGBWW
+                self._attr_is_on = any(c > 0 for c in rgbww)
+            elif (hs := kwargs.get(ATTR_HS_COLOR)) is not None:
+                hsv_params = {"hue": hs[0], "saturation": hs[1], "t": 500}
+                self._attr_hs_color = hs
+                # self._attr_color_mode = ColorMode.RGBWW
+            if (ct := kwargs.get(ATTR_COLOR_TEMP_KELVIN)) is not None:
+                hsv_params["ct"] = ct
+                self._attr_color_temp_kelvin = ct
+                # we do not actually switch to color temp mode because we use it as a feature for hsv
+                # self._attr_color_mode = ColorMode.COLOR_TEMP
+
+            if not kwargs:  # Turn on with last known state or default
+                await self._controller.set_hsv(brightness=100)
+
+            if (brightness := kwargs.get(ATTR_BRIGHTNESS)) is not None:
+                hsv_params["brightness"] = scale_to_ranged_value(
+                    (0, 255), (0, 100), brightness
+                )
+                self._attr_brightness = brightness
+                self._attr_is_on = brightness > 0
+            if (transition := kwargs.get(ATTR_TRANSITION)) is not None:
+                hsv_params["t"] = int(transition * 1000)  # seconds to milliseconds
+
+        except ControllerUnavailableError as e:
+            _logger.error("async_turn_on failed. Controller error: %s", e)
+        else:
+            if hsv_params:
+                await self._controller.set_hsv(**hsv_params)
+                attr_changed = True
+
+            if attr_changed:
+                self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the entity off."""
@@ -220,7 +318,14 @@ class RgbwwLight(LightEntity):
         }
         self._hass.bus.async_fire("transition_finished", event_data)
 
-    def on_config_update(self, config: dict) -> None:
-        self._attr_max_color_temp_kelvin = config["color"]["colortemp"]["cw"]
-        self._attr_min_color_temp_kelvin = config["color"]["colortemp"]["ww"]
+    def on_config_update(self) -> None:
+        if not self._controller.state_completed:
+            return
+
+        self._attr_max_color_temp_kelvin = self._controller.config["color"][
+            "colortemp"
+        ]["cw"]
+        self._attr_min_color_temp_kelvin = self._controller.config["color"][
+            "colortemp"
+        ]["ww"]
         self.async_write_ha_state()

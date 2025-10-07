@@ -41,23 +41,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Erstelle eine Hub-Instanz für DIESES GERÄT
     # Wir übergeben die entry.unique_id (also die IP) für eine eindeutige Identifikation
-    controller = RgbwwController(host)
+    controller = RgbwwController(hass, host)
     await controller.connect()
 
     entry.runtime_data = controller
-
-    # --- DEVICE REGISTRATION ---
-    # This is the new part. We create a device in the registry.
-    dev_reg = device_registry.async_get(hass)
-    dev_reg.async_get_or_create(
-        config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.unique_id)},  # Must be a set of tuples
-        name=entry.title,  # The name the user gave in the config flow
-        manufacturer="Homebrew Hardware",
-        model="FHEM RGBWW LED Controller",  # Replace with actual model
-        #sw_version=f"{controller.info['git_version']} (WebApp:{controller.info['webapp_version']})",
-    )
-    # --- END DEVICE REGISTRATION ---
 
     # This forwards the setup to your light.py file.
     await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
