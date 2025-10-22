@@ -2,32 +2,26 @@
 
 from __future__ import annotations
 
-from config.custom_components.fhem_rgbwwcontroller.rgbww_entity import RgbwwEntity
-import homeassistant.helpers.device_registry as dr
-
 from datetime import timedelta
 import logging
 from typing import cast
-from .const import DOMAIN
+
+import voluptuous as vol
+
 from config.custom_components.fhem_rgbwwcontroller.core.rgbww_controller import (
     RgbwwController,
 )
-from homeassistant.config_entries import ConfigEntry
-import voluptuous as vol
-
+from config.custom_components.fhem_rgbwwcontroller.rgbww_entity import RgbwwEntity
 from homeassistant.components.sensor import (
     PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
-    SensorDeviceClass,
     SensorEntity,
 )
-from homeassistant.const import UnitOfEnergy
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.entity_platform import (
-    AddConfigEntryEntitiesCallback,
-    AddEntitiesCallback,
-)
-from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 

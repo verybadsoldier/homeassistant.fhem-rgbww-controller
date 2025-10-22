@@ -1,34 +1,30 @@
-# noqa: D102
 import asyncio
 import contextlib
+from dataclasses import dataclass
 import enum
 import json
-import os
 import logging
-from dataclasses import dataclass
+import os
 import random
 import time
 from typing import Literal, Protocol
-import async_timeout
+
 from aiohttp import ClientError
+import async_timeout
+
+from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.core import HomeAssistant
-from homeassistant.util import aiohttp
+
 from .animation_syntax import AnimCommand
 
 _logger = logging.getLogger(__name__)
 
 
-class _HttpMethod(enum.Enum):
-    GET = enum.auto()
-    POST = enum.auto()
-
-
 class ControllerUnavailableError(Exception):
     """Custom exception for when the controller is unavailable."""
 
-    pass
+    ...
 
 
 class RgbwwStateUpdate(Protocol):

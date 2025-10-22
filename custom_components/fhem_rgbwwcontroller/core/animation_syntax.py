@@ -1,15 +1,12 @@
-import re
 from dataclasses import dataclass
-
-# [<h>],[<s>],[<v>] [<fadetime>] [<staytime>s]
-
-import re
-from dataclasses import dataclass
-from typing import Optional
 from enum import StrEnum
 
+# [<h>],[<s>],[<v>] [<fadetime>] [<staytime>s]
+import re
+from typing import Optional
 
-class QueueingPolicy(StrEnum):
+
+class _QueueingPolicy(StrEnum):
     BACK = "back"
     FRONT = "front"
     FRONT_RESET = "front_reset"
@@ -28,7 +25,7 @@ class AnimCommand:
     fade_speed: bool = False
     stay: int | None = None
     reque: bool | None = None
-    queueing_policy: QueueingPolicy | None = None
+    queueing_policy: _QueueingPolicy | None = None
     anim_name: str | None = None
     direction_long: bool = False  # True if long, False if short
 
@@ -110,15 +107,15 @@ def parse_anim_command(command_str: str) -> AnimCommand:
                 if "e" in p:
                     if cmd.queueing_policy is not None:
                         raise RuntimeError("cannot use multiple queuing policy flags")
-                    cmd.queueing_policy = QueueingPolicy.FRONT_RESET
+                    cmd.queueing_policy = _QueueingPolicy.FRONT_RESET
                 if "f" in p:
                     if cmd.queueing_policy is not None:
                         raise RuntimeError("cannot use multiple queuing policy flags")
-                    cmd.queueing_policy = QueueingPolicy.FRONT
+                    cmd.queueing_policy = _QueueingPolicy.FRONT
                 if "q" in p:
                     if cmd.queueing_policy is not None:
                         raise RuntimeError("cannot use multiple queuing policy flags")
-                    cmd.queueing_policy = QueueingPolicy.BACK
+                    cmd.queueing_policy = _QueueingPolicy.BACK
     return cmd
 
 

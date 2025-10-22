@@ -1,20 +1,4 @@
-set_hsv_advanced_old:
-  target:
-    entity:
-      domain: light
-  fields:
-    hsv_command_string:
-      example: "+20,100,20 2 :setHueAnim"
-      required: true
-      selector:
-        text:
-    hsv_command_string2:
-      example: "+20,100,20 2 :setHueAnim"
-      required: true
-      selector:
-        text:
-
-animation_cli:
+animation_cli_hsv:
   name: Run an animation on the controller
   description: >
     Sets a sequence of colors using a list of HSV values.
@@ -31,7 +15,24 @@ animation_cli:
       selector:
         text:
 
-animation:
+animation_cli_raw:
+  name: Run an RGB(WW) animation on the controller
+  description: >
+    Sets a sequence of colors using a list of RGB(WW) values.
+    The list must not be empty.
+  target:
+    entity:
+      domain: light
+  fields:
+    anim_definition_command:
+      name: Command string to run one or more animation
+      description: "A command string the command string syntax"
+      required: true
+      example: "103,0,5,453 5"
+      selector:
+        text:
+
+animation_hsv:
   name: Run an animation on the controller
   description: >
     Sets a sequence of colors using a list of HSV values.
@@ -109,35 +110,44 @@ animation:
               selector:
                 boolean:
 
-animation_bak:
-  name: Run an animation on the controller
+
+animation_raw:
+  name: Run an animation on the controller using the RGB(WW) channles
   description: >
-    Sets a sequence of colors using a list of HSV values.
+    Sets a sequence of colors using a list of RGB(WW) values.
     The list must not be empty.
   target:
     entity:
       domain: light
   fields:
     anim_definition:
-      name: HSV Color List
-      description: "A list of HSV objects. Each value can be 0-100 or a relative string like '+1000'."
+      name: Animation Commands
+      description: "A list of command objects."
       required: true
       selector:
         object:
-          label_field: name
-          description_field: percentage
+          label_field: hue
+          description_field: transition_mode
           multiple: true
           fields:
-            hue:
-              label: Hue
+            red:
+              label: Red
               selector:
                 text:
-            saturation:
-              label: Saturation
+            green:
+              label: Green
               selector:
                 text:
-            brightness:
-              label: Brightness
+            blue:
+              label: Blue
+              selector:
+                text:
+            cw:
+              label: Cold White
+              selector:
+                text:
+            ww:
+              label: Warm White
               selector:
                 text:
             transition_mode:
@@ -165,6 +175,7 @@ animation_bak:
                   unit_of_measurement: "ms"
             queue_policy:
               label: Queue Policy
+              required: false
               selector:
                 select:
                   options:
@@ -178,7 +189,7 @@ animation_bak:
                       value: front_reset
                   mode: dropdown
             requeue:
-              label: Requeue
+              label: Requeue when finished
               selector:
                 boolean:
 

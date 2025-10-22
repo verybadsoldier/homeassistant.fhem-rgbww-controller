@@ -1,11 +1,10 @@
-import os
-import random
 import asyncio
 import ipaddress
 import logging
+import os
+import random
 import time
 
-import httpx
 import netifaces
 
 from homeassistant.core import HomeAssistant

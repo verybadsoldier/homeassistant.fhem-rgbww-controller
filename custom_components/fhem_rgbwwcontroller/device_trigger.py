@@ -36,13 +36,7 @@ from homeassistant.helpers import device_registry as dr
 async def async_get_triggers(hass, device_id):
     """Return a list of supported triggers."""
 
-    device_registry = dr.async_get(hass)
-    device = device_registry.async_get(device_id)
-
     triggers = []
-
-    # Determine which triggers are supported by this device_id ...
-
     triggers.append(
         TRIGGER_SCHEMA(
             {
