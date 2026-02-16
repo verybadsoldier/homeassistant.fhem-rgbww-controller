@@ -1,0 +1,6 @@
+{
+  "name": "FHEM RGBWW Controller",
+  "content_in_root": false,
+  "filename": "my_super_awesome_thing.js",
+  "country": ["DE"]
+}
