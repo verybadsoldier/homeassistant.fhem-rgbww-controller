@@ -6,7 +6,7 @@ from typing import Any, cast
 
 import voluptuous as vol
 
-from config.custom_components.fhem_rgbwwcontroller.rgbww_entity import RgbwwEntity
+from .rgbww_entity import RgbwwEntity
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_COLOR_TEMP_KELVIN,

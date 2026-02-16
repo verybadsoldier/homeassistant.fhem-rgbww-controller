@@ -1,4 +1,4 @@
-from config.custom_components.fhem_rgbwwcontroller.core.rgbww_controller import (
+from .core.rgbww_controller import (
     RgbwwController,
 )
 from homeassistant.core import HomeAssistant

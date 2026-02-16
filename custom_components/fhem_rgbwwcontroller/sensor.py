@@ -8,10 +8,10 @@ from typing import cast
 
 import voluptuous as vol
 
-from config.custom_components.fhem_rgbwwcontroller.core.rgbww_controller import (
+from .core.rgbww_controller import (
     RgbwwController,
 )
-from config.custom_components.fhem_rgbwwcontroller.rgbww_entity import RgbwwEntity
+from .rgbww_entity import RgbwwEntity
 from homeassistant.components.sensor import (
     PLATFORM_SCHEMA as SENSOR_PLATFORM_SCHEMA,
     SensorEntity,

@@ -12,7 +12,7 @@ from typing import Any, cast
 from httpx import HTTPError
 import voluptuous as vol
 
-from config.custom_components.fhem_rgbwwcontroller.core.rgbww_controller import (
+from .core.rgbww_controller import (
     RgbwwController,
 )
 from homeassistant.config_entries import (

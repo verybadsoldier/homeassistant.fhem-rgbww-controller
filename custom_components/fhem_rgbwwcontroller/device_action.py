@@ -4,7 +4,7 @@ from homeassistant.const import CONF_DEVICE_ID, CONF_DOMAIN, CONF_ENTITY_ID, CON
 from homeassistant.core import Context, HomeAssistant
 from homeassistant.helpers import config_validation as cv, entity_registry as er
 
-from .const import DOMAIN  # Import your integration's domain
+from .const import DOMAIN
 
 # Define constants for our action
 ACTION_TYPE_TURN_ON_LOG = "turn_on_with_log"
