@@ -7,8 +7,6 @@ import time
 from collections.abc import Awaitable
 
 
-import netifaces
-
 from homeassistant.core import HomeAssistant
 
 from .rgbww_controller import ControllerUnavailableError, RgbwwController
@@ -16,45 +14,6 @@ from .rgbww_controller import ControllerUnavailableError, RgbwwController
 _logger = logging.getLogger(__name__)
 
 _scan_semaphore = asyncio.Semaphore(25)  # Limit to 25 concurrent scans
-
-
-def get_scan_range() -> ipaddress.IPv4Network | None:
-    """
-    Finds the active network interface and returns its IP range.
-    """
-    try:
-        # Find the default gateway to determine the active interface
-        gateways = netifaces.gateways()
-        default_gateway = gateways.get("default", {}).get(netifaces.AF_INET)
-
-        if not default_gateway:
-            _logger.error(
-                "❌ Could not find the default gateway. Please check your network connection."
-            )
-            return None
-
-        interface = default_gateway[1]
-        _logger.info(f"🌐 Found active interface: {interface}")
-
-        # Get the addresses for the found interface
-        addresses = netifaces.ifaddresses(interface)
-        ipv4_info = addresses.get(netifaces.AF_INET)
-
-        if not ipv4_info:
-            _logger.info("❌ No IPv4 address found for interface %s.", str(interface))
-            return None
-
-        # Extract IP and netmask
-        ip_address = ipv4_info[0]["addr"]
-        netmask = ipv4_info[0]["netmask"]
-
-        # Create a network object from the IP and netmask
-        # The 'strict=False' part handles cases where the IP might be a network/broadcast address
-        return ipaddress.IPv4Network(f"{ip_address}/{netmask}", strict=False)
-
-    except Exception as e:
-        _logger.exception("An error occurred when detecting the IP range.", exc_info=e)
-        return None
 
 
 def get_scan_coros(

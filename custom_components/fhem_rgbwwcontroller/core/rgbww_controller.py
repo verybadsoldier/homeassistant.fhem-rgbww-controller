@@ -205,6 +205,8 @@ class RgbwwController:
         """
         Connects to a server and automatically reconnects if the connection is lost.
         """
+        self._buffer = ""
+        
         if self._simulation:
             try:
                 init = True
