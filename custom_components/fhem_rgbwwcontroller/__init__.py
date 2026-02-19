@@ -2,21 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, Platform
-from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.core import HomeAssistant
+
 from .const import DOMAIN
 from .core.rgbww_controller import RgbwwController
-from homeassistant.helpers import device_registry, entity_platform
-from homeassistant.helpers.typing import ConfigType
-from homeassistant.helpers import (
-    config_validation as cv,
-    service,
-)
-import logging
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 _logger = logging.getLogger(__name__)
 

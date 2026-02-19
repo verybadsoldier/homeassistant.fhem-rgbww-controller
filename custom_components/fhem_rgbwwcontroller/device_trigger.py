@@ -1,16 +1,19 @@
 from homeassistant.const import (
-    CONF_ENTITY_ID,
     CONF_TYPE,
-    CONF_NAME,
     CONF_DEVICE_ID,
     CONF_DOMAIN,
 )
-from homeassistant.helpers.config_validation import TRIGGER_BASE_SCHEMA
 import voluptuous as vol
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.components.homeassistant.triggers import event as event_trigger
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
+from .const import DOMAIN
+
+from homeassistant.const import (
+    CONF_PLATFORM,
+)
+
 
 
 TRIGGER_TYPES = {"transition_finished"}
@@ -21,16 +24,6 @@ TRIGGER_SCHEMA = DEVICE_TRIGGER_BASE_SCHEMA.extend(
     }
 )
 
-from .const import DOMAIN
-
-from homeassistant.const import (
-    CONF_DEVICE_ID,
-    CONF_DOMAIN,
-    CONF_PLATFORM,
-    CONF_TYPE,
-)
-
-from homeassistant.helpers import device_registry as dr
 
 
 async def async_get_triggers(hass, device_id):

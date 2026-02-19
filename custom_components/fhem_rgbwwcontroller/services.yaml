@@ -5,6 +5,7 @@ animation_cli_hsv:
   target:
     entity:
       domain: light
+      integration: fhem_rgbwwcontroller
   fields:
     anim_definition_command:
       name: Command string to run one or more animation
@@ -21,6 +22,7 @@ animation_cli_rgbww:
   target:
     entity:
       domain: light
+      integration: fhem_rgbwwcontroller
   fields:
     anim_definition_command:
       name: Command string to run one or more animation
@@ -38,6 +40,7 @@ animation_hsv:
   target:
     entity:
       domain: light
+      integration: fhem_rgbwwcontroller
   fields:
     anim_definitions:
       name: Animation Commands
@@ -120,6 +123,7 @@ animation_rgbww:
   target:
     entity:
       domain: light
+      integration: fhem_rgbwwcontroller
   fields:
     anim_definitions:
       name: Animation Commands
@@ -242,3 +246,4 @@ control_channel:
   target:
     entity:
       domain: light
+      integration: fhem_rgbwwcontroller

@@ -29,8 +29,6 @@ _HTTP_HEADERS = {
 class ControllerUnavailableError(Exception):
     """Custom exception for when the controller is unavailable."""
 
-    ...
-
 
 class RgbwwStateUpdate(Protocol):
     def on_update_color(self) -> None: ...
@@ -169,9 +167,10 @@ class RgbwwController:
 
     _TCP_PORT = 9090
     _WATCHDOG_DISCONNECT_TIMEOUT = 70
-    _HTTP_REQUEST_TIMEOUT = 2
 
-    def __init__(self, hass: HomeAssistant, host: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, host: str, http_request_timeout: int = 20
+    ) -> None:
         self._hass = hass
         self.host = host
         self.connected = False
@@ -187,6 +186,7 @@ class RgbwwController:
         self._writer: asyncio.StreamWriter | None = None
         self.state_completed = False
         self._simulation = os.getenv("SIMULATION")
+        self._http_request_timeout = http_request_timeout
 
     def _consume_json_msg(self) -> dict[str, Any] | None:
         try:
@@ -202,11 +202,9 @@ class RgbwwController:
             return json_obj
 
     async def _run_connection_task(self):
-        """
-        Connects to a server and automatically reconnects if the connection is lost.
-        """
+        """Connects to a server and automatically reconnects if the connection is lost."""
         self._buffer = ""
-        
+
         if self._simulation:
             try:
                 init = True
@@ -255,8 +253,6 @@ class RgbwwController:
 
                 # 2. Connection Established Notification
                 # If we reach this line, the connection was successful.
-                ##peername = writer.get_extra_info('peername')
-                ##print(f"✅ Connection established with {peername}")
                 await self.on_connect_status_change(True)
 
                 # 3. Main loop to read data (your "work" goes here)
@@ -345,9 +341,7 @@ class RgbwwController:
         )
 
     async def disconnect(self):
-        """
-        External function to signal the client to stop.
-        """
+        """External function to signal the client to stop."""
         if self._stop_event.is_set():
             return  # Already stopping
 
@@ -430,18 +424,10 @@ class RgbwwController:
         match json_msg["method"]:
             case "color_event":
                 self._update_colorstate_from_json(json_msg["params"])
-                print(f"{self.host} - {self.color}")
+                _logger.debug("%s - %s", self.host, self.color)
 
                 for x in self._callbacks.values():
                     x.on_update_color()
-            # my $colorMode = "raw";
-            # if ( exists $obj->{params}->{hsv} ) {
-            #    $colorMode = "hsv";
-            #    EspLedController_UpdateReadingsHsv( $hash, $obj->{params}{hsv}{h}, $obj->{params}{hsv}{s}, $obj->{params}{hsv}{v}, $obj->{params}{hsv}{ct} );
-            # }
-            # EspLedController_UpdateReadingsRaw( $hash, $obj->{params}{raw}{r}, $obj->{params}{raw}{g}, $obj->{params}{raw}{b}, $obj->{params}{raw}{cw}, $obj->{params}{raw}{ww} );
-            # readingsSingleUpdate( $hash, 'colorMode', $colorMode, 1 );
-            # }
             case "info":
                 self._info_cached = json_msg["params"]
             case "transition_finished":
@@ -449,16 +435,12 @@ class RgbwwController:
                     x.on_transition_finished(
                         json_msg["params"]["name"], json_msg["params"]["requeued"]
                     )
-            # elsif ( $obj->{method} eq "transition_finished" ) {
-            # my $msg = $obj->{params}{name} . "," . ($obj->{params}{requeued} ? "requeued" : "finished");
-            # readingsSingleUpdate( $hash, "tranisitionFinished", $msg, 1 );
-            # }
             case "config":
                 self._config_cached = json_msg["params"]
                 for x in self._callbacks.values():
                     x.on_config_update()
             case "keep_alive":
-                ...
+                pass
             case "state_completed":
                 self.state_completed = True
                 for x in self._callbacks.values():
@@ -468,23 +450,19 @@ class RgbwwController:
                 for x in self._callbacks.values():
                     x.on_clock_slave_status_update()
 
-            # elsif ( $obj->{method} eq "keep_alive" ) {
-            # Log3( $hash, 4, "$hash->{NAME}: EspLedController_Read: keep_alive received" );
-            # $hash->{LAST_RECV} = $now;
-            # }
             case "clock_slave_status":
                 ...
-            # elsif ( $obj->{method} eq "clock_slave_status" ) {
             # readingsBeginUpdate($hash);
             # readingsBulkUpdate( $hash, 'clockSlaveOffset',     $obj->{params}{offset} );
             # readingsBulkUpdate( $hash, 'clockCurrentInterval', $obj->{params}{current_interval} );
             # readingsEndUpdate( $hash, 1 );
             # }
             case _:
-                ...
-            # else {
-            # Log3( $name, 3, "$hash->{NAME}: EspLedController_ProcessRead: Unknown message type: " . $obj->{method} );
-            # }
+                _logger.warning(
+                    "%s: EspLedController_ProcessRead: Unknown message type: %s",
+                    self.host,
+                    json_msg["method"],
+                )
 
     async def refresh(self) -> None:
         """Refresh the state by requesting it from the controller."""
@@ -530,12 +508,10 @@ class RgbwwController:
                 return None
             raise HomeAssistantError("Endpoint not supported by simulation")
 
-        print("POST %s - Payload: %s", endpoint, payload)
-
         session = async_get_clientsession(self._hass)
         try:
             # Use a timeout to prevent the request from hanging indefinitely
-            async with asyncio.timeout(self._HTTP_REQUEST_TIMEOUT):
+            async with asyncio.timeout(self._http_request_timeout):
                 # The actual request using the shared session
                 response = await session.post(
                     f"http://{self.host}/{endpoint}",
@@ -563,7 +539,7 @@ class RgbwwController:
         session = async_get_clientsession(self._hass)
         try:
             # Use a timeout to prevent the request from hanging indefinitely
-            async with asyncio.timeout(self._HTTP_REQUEST_TIMEOUT):
+            async with asyncio.timeout(self._http_request_timeout):
                 # The actual request using the shared session
                 response = await session.get(
                     f"http://{self.host}/{endpoint}", headers=_HTTP_HEADERS
@@ -580,8 +556,3 @@ class RgbwwController:
             raise ControllerUnavailableError(
                 f"Failed to connect to controller: {err}"
             ) from err
-
-
-if __name__ == "__main__":
-    ctrl = RgbwwController(None, "192.168.2.53")
-    ctrl.send_color_command(ColorCommandHsv(h=120, s=100, v=100))

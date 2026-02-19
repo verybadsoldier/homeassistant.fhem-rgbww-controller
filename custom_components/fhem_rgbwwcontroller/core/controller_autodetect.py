@@ -1,11 +1,9 @@
 import asyncio
+from collections.abc import Awaitable
 import ipaddress
 import logging
 import os
 import random
-import time
-from collections.abc import Awaitable
-
 
 from homeassistant.core import HomeAssistant
 
@@ -35,13 +33,12 @@ async def _check_ip_dummy(ip: str) -> RgbwwController | None:
     await asyncio.sleep(random.randint(2, 20))
     if random.choice([True, False]):
         return None
-    else:
-        return RgbwwController(ip)
+    return RgbwwController(ip)
 
 
 async def _check_ip(hass: HomeAssistant, ip: str) -> RgbwwController | None:
     async with _scan_semaphore:
-        controller = RgbwwController(hass, ip)
+        controller = RgbwwController(hass, ip, http_request_timeout=2)
 
         try:
             await controller.refresh()
@@ -51,20 +48,3 @@ async def _check_ip(hass: HomeAssistant, ip: str) -> RgbwwController | None:
             return None
         else:
             return controller
-
-
-async def main_autodetect():
-    now = time.monotonic()
-    # mask = AutoDetector.get_scan_range()
-
-    network = ipaddress.IPv4Network("192.168.2.0/24")
-    devices = await get_scan_coros(network)
-    now2 = time.monotonic()
-    print(f"Found {len(devices)} devices:")
-
-    for device in devices:
-        print(f"- {device.host}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main_autodetect())

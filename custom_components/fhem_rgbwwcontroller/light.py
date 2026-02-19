@@ -292,8 +292,6 @@ class RgbwwLight(RgbwwEntity, LightEntity):
             hass=hass, controller=controller, device_id=config_entry.unique_id
         )
 
-        # if unique_id is not None:
-        #    self._attr_unique_id = unique_id + "_light"
         self._attr_name = config_entry.title + " Light"
         self._attr_unique_id = f"{config_entry.unique_id}_lightunique"
 
@@ -306,11 +304,9 @@ class RgbwwLight(RgbwwEntity, LightEntity):
             LightEntityFeature.TRANSITION | LightEntityFeature.FLASH
             # | LightEntityFeature.EFFECT
         )
+
         # Initialize the attributes dictionary
         self._attr_extra_state_attributes = {}
-
-        # self._attr_effect_list = ["Pause", "Continue", "Skip", "Stop"]
-        # self._attr_effect = None
 
     async def async_added_to_hass(self) -> None:
         """Subscribe to the events."""
