@@ -406,7 +406,7 @@ class RgbwwLight(RgbwwEntity, LightEntity):
         """Turn the entity on."""
         try:
             attr_changed = False
-            hsv_params: dict[str, Any] = {}
+            hsv_params: dict[str, Any] = {"speed_or_fade_duration": 500}
 
             if (rgbww := kwargs.get(ATTR_RGBWW_COLOR)) is not None:
                 raw_conv = functools.partial(
@@ -426,7 +426,7 @@ class RgbwwLight(RgbwwEntity, LightEntity):
                 self._attr_color_mode = ColorMode.RGBWW
                 self._attr_is_on = any(c > 0 for c in rgbww)
             elif (hs := kwargs.get(ATTR_HS_COLOR)) is not None:
-                hsv_params = {"h": hs[0], "s": hs[1], "speed_or_fade_duration": 500}
+                hsv_params = {"h": hs[0], "s": hs[1]}
                 self._attr_hs_color = hs
                 # self._attr_color_mode = ColorMode.RGBWW
             if (ct := kwargs.get(ATTR_COLOR_TEMP_KELVIN)) is not None:
