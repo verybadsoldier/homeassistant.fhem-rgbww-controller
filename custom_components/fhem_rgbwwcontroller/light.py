@@ -468,7 +468,7 @@ class RgbwwLight(RgbwwEntity, LightEntity):
             "name": name,
             "requeued": requeued,
         }
-        self._hass.bus.async_fire("transition_finished", event_data)
+        self.hass.bus.async_fire("transition_finished", event_data)
 
     def on_config_update(self) -> None:
         if not self._controller.state_completed:
